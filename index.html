@@ -10,6 +10,8 @@
 <!-- Firebase JS SDK (v10 compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Separate Configuration File for API Key & Security -->
+<script src="config.js"></script>
 <style>
   :root{
     --ink:#141B3C; --navy:#1D2B6B; --blue:#2F5FE0; --blue2:#4C7CF0;
@@ -162,7 +164,7 @@
   @media print{
     @page{size:A4;margin:10mm}
     body{background:#fff!important;color:#000!important}
-    .masthead,.formPane,.bar,.foot,.pvhead,.mobileOnly,.hint,.savedInvoicesCard,#savedInvoicesSection,.toast,.fbStatusBadge{display:none!important}
+    .masthead,.formPane,.bar,.foot,.pvhead,.mobileOnly,.hint,.savedInvoicesCard,#savedInvoicesSection,.toast,.fbStatusBadge,.lockOverlay{display:none!important}
     .wrap{padding:0!important;max-width:none!important;margin:0!important}
     .cols{display:block!important}
     .previewPane{position:static!important;width:100%!important;margin:0!important;padding:0!important}
@@ -174,6 +176,20 @@
     th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .totals .tr.grand{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
+
+  /* ---- Password Lock Overlay ---- */
+  .lockOverlay{position:fixed;inset:0;background:rgba(20,27,60,0.92);backdrop-filter:blur(12px);
+    z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;
+    transition:opacity 0.3s ease,visibility 0.3s ease}
+  .lockOverlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+  .lockCard{background:#fff;border-radius:20px;padding:32px 28px;max-width:380px;width:100%;
+    text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.3);animation:lockPop 0.3s cubic-bezier(0.175,0.885,0.32,1.275)}
+  @keyframes lockPop{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}
+  .lockIcon{font-size:44px;margin-bottom:10px;line-height:1}
+  .lockCard h2{margin:0 0 4px;font-family:'Baloo 2',sans-serif;font-size:26px;color:var(--blue)}
+  .lockCard p{margin:0 0 20px;font-size:13px;color:var(--muted);line-height:1.4}
+  .lockCard input{font-size:18px;letter-spacing:6px;text-align:center;padding:12px;font-weight:700}
+  .lockErrMsg{color:var(--req);font-size:12.5px;font-weight:600;margin-top:8px;display:none}
 
   /* ---- Firebase & Saved Invoices Styles ---- */
   .fbStatusBadge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
@@ -216,10 +232,27 @@
 </head>
 <body>
 
+<!-- Password Protection Overlay -->
+<div class="lockOverlay" id="lockOverlay">
+  <div class="lockCard">
+    <div class="lockIcon">🔒</div>
+    <h2>SMIT DIGI</h2>
+    <p>Enter security passcode to unlock application</p>
+    <form id="lockForm" onsubmit="handleUnlock(event)">
+      <input type="password" id="passInput" maxlength="10" placeholder="Passcode" autofocus autocomplete="current-password" inputmode="numeric">
+      <div class="lockErrMsg" id="lockErrMsg">Invalid passcode! Try again.</div>
+      <button class="btn wide" type="submit" style="margin-top:14px;font-size:15px;padding:11px">Unlock Application</button>
+    </form>
+  </div>
+</div>
+
 <div class="wrap">
   <div class="masthead">
     <div class="brand"><h1>SMIT DIGI</h1><span>Personal invoice generator</span></div>
-    <div class="badge" id="mastheadBadge">Saved to Firebase &amp; Device</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn ghost sm" type="button" onclick="lockApp()" title="Lock application">🔒 Lock</button>
+      <div class="badge" id="mastheadBadge">Saved to Firebase &amp; Device</div>
+    </div>
   </div>
 
   <div class="cols">
@@ -391,6 +424,7 @@
 <div class="bar"><div class="in">
   <div class="tot"><div class="k">Total</div><div class="v" id="barLabel">&#8377;0.00</div></div>
   <button class="btn ghost sm mobileOnly" type="button" onclick="scrollToSavedInvoices()">Invoices</button>
+  <button class="btn ghost sm" type="button" onclick="lockApp()" title="Lock Application">🔒 Lock</button>
   <button class="btn ghost sm" type="button" onclick="newInvoice()">New</button>
   <button class="btn btn-fb sm" type="button" onclick="saveInvoiceToFirebase(true)">☁️ Save to Firebase</button>
   <button class="btn sm" type="button" onclick="doSave()">Export PDF</button>
@@ -634,16 +668,56 @@ var tt;
 function toast(m){var e=$('toast');e.textContent=m;e.classList.add('on');
   clearTimeout(tt);tt=setTimeout(function(){e.classList.remove('on')},2500)}
 
-/* ---------- Firebase Integration ---------- */
-const firebaseConfig = {
-  apiKey: "AIzaSyCEm_OZJFtVEHxYilCvOEc9iH5zlNb4osE",
-  authDomain: "smit-digi.firebaseapp.com",
-  projectId: "smit-digi",
-  storageBucket: "smit-digi.firebasestorage.app",
-  messagingSenderId: "69329448679",
-  appId: "1:69329448679:web:99a4e53e8e35ef97a4bc42"
-};
+/* ---------- Security Passcode Lock ---------- */
+function checkAuthOnLoad(){
+  var isAuth = sessionStorage.getItem('smit_digi_auth') === 'true';
+  var overlay = $('lockOverlay');
+  if(isAuth){
+    if(overlay) overlay.classList.add('hidden');
+  } else {
+    if(overlay) overlay.classList.remove('hidden');
+    setTimeout(function(){ var inp = $('passInput'); if(inp) inp.focus(); }, 100);
+  }
+}
 
+async function handleUnlock(e){
+  if(e) e.preventDefault();
+  var input = $('passInput');
+  var errMsg = $('lockErrMsg');
+  if(!input) return;
+  var pin = input.value;
+
+  if(!window.SMIT_CONFIG || !window.SMIT_CONFIG.verifyPasscode){
+    if(errMsg){ errMsg.textContent = 'Configuration missing!'; errMsg.style.display = 'block'; }
+    return;
+  }
+
+  var isValid = await window.SMIT_CONFIG.verifyPasscode(pin);
+  if(isValid){
+    sessionStorage.setItem('smit_digi_auth', 'true');
+    var overlay = $('lockOverlay');
+    if(overlay) overlay.classList.add('hidden');
+    if(errMsg) errMsg.style.display = 'none';
+    input.value = '';
+    toast('Application Unlocked');
+  } else {
+    if(errMsg){ errMsg.textContent = 'Invalid Passcode! Try again.'; errMsg.style.display = 'block'; }
+    input.classList.add('bad');
+    input.value = '';
+    setTimeout(function(){ input.classList.remove('bad'); input.focus(); }, 400);
+  }
+}
+
+function lockApp(){
+  sessionStorage.removeItem('smit_digi_auth');
+  var overlay = $('lockOverlay');
+  if(overlay) overlay.classList.remove('hidden');
+  var input = $('passInput');
+  if(input){ input.value = ''; input.focus(); }
+  toast('Application Locked');
+}
+
+/* ---------- Firebase Integration ---------- */
 var db = null;
 var cachedInvoices = [];
 
@@ -656,9 +730,17 @@ function initFirebase(){
     }
     return;
   }
+  var fbConfig = (window.SMIT_CONFIG && window.SMIT_CONFIG.firebaseConfig) ? window.SMIT_CONFIG.firebaseConfig : null;
+  if(!fbConfig){
+    if(badge){
+      badge.className = 'fbStatusBadge error';
+      badge.innerHTML = '<span class="dot"></span>Config Missing';
+    }
+    return;
+  }
   try{
     if(!firebase.apps.length){
-      firebase.initializeApp(firebaseConfig);
+      firebase.initializeApp(fbConfig);
     }
     db = firebase.firestore();
     if(badge){
@@ -916,10 +998,11 @@ function deleteInvoiceFromFirebase(id){
 
 /* ---------- boot ---------- */
 (function(){
+  checkAuthOnLoad();
   loadProfile();
   document.querySelectorAll('#items .item').forEach(wireItem);
   document.querySelectorAll('input,textarea').forEach(function(el){
-    if(el.closest('#items')||el.id==='yQr')return;
+    if(el.closest('#items')||el.id==='yQr'||el.id==='passInput')return;
     el.addEventListener('input',function(){el.classList.remove('bad');render()});
   });
   wireQrUpload();
