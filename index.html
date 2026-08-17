@@ -161,14 +161,14 @@
 
   @media print{
     @page{size:A4;margin:10mm}
-    body{background:#fff}
-    .masthead,.formPane,.bar,.foot,.pvhead,.mobileOnly{display:none!important}
-    .wrap{padding:0;max-width:none}
-    .cols{display:block}
-    .previewPane{position:static!important}
-    .paperOuter{border-radius:0;padding:0;background:#fff}
+    body{background:#fff!important;color:#000!important}
+    .masthead,.formPane,.bar,.foot,.pvhead,.mobileOnly,.hint,.savedInvoicesCard,#savedInvoicesSection,.toast,.fbStatusBadge{display:none!important}
+    .wrap{padding:0!important;max-width:none!important;margin:0!important}
+    .cols{display:block!important}
+    .previewPane{position:static!important;width:100%!important;margin:0!important;padding:0!important}
+    .paperOuter{border-radius:0!important;padding:0!important;background:#fff!important;box-shadow:none!important}
     .stripe{-webkit-print-color-adjust:exact;print-color-adjust:exact;border-radius:0;margin-bottom:14px}
-    .paper{padding:0}
+    .paper{padding:0!important;box-shadow:none!important}
     tr{page-break-inside:avoid}
     .payblock{page-break-inside:avoid}
     th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
